@@ -1,13 +1,10 @@
-
 const express = require('express');
 const admin = require('firebase-admin');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 
-
 const app = express();
 app.use(express.json());
-
 
 const serviceAccount = require('./path/to/serviceAccountKey.json'); 
 admin.initializeApp({
@@ -55,9 +52,7 @@ async function verifyOTP(email, otp) {
   }
 }
 
-
-
-
+// Request password reset route
 app.post('/request-password-reset', async (req, res) => {
   const { email } = req.body;
   const emailRegex = /\S+@\S+\.\S+/;
@@ -66,7 +61,6 @@ app.post('/request-password-reset', async (req, res) => {
   }
 
   try {
-    // Generate OTP and reset link
     const otp = generateOTP();
     const actionCodeSettings = {
       url: `https://yourapp.com/reset-password?email=${encodeURIComponent(email)}`,
@@ -77,7 +71,7 @@ app.post('/request-password-reset', async (req, res) => {
     await storeOTP(email, otp);
     const mailOptions = {
       to: email,
-      from: 'no-reply@yourdomain.com',
+      from: '',
       subject: 'Password Reset Request',
       html: `
         <p>You requested a password reset.</p>
@@ -90,7 +84,6 @@ app.post('/request-password-reset', async (req, res) => {
     };
 
     await transporter.sendMail(mailOptions);
-
     res.status(200).send('If the email is registered, a password reset email has been sent.');
   } catch (error) {
     console.error('Error generating password reset link:', error);
@@ -98,6 +91,7 @@ app.post('/request-password-reset', async (req, res) => {
   }
 });
 
+// Verify OTP route
 app.post('/verify-otp', async (req, res) => {
   const { email, otp } = req.body;
 
@@ -115,6 +109,7 @@ app.post('/verify-otp', async (req, res) => {
   }
 });
 
+// Update password route (after OTP verification)
 app.post('/update-password', async (req, res) => {
   const { email, newPassword } = req.body;
 
@@ -130,6 +125,29 @@ app.post('/update-password', async (req, res) => {
   } catch (error) {
     console.error('Error updating password:', error);
     res.status(500).send('Server error.');
+  }
+});
+
+// Change password by UID route
+app.post('/changepassword', async (req, res) => {
+  const { uid, password } = req.body;
+
+  if (!uid) {
+    return res.status(400).send('(UID) is required');
+  }
+  if (!password) {
+    return res.status(400).send('(Password) is required');
+  }
+
+  try {
+    await admin.auth().updateUser(uid, {
+      password: password
+    });
+    console.log('Successfully updated user');
+    res.status(200).send('Successfully updated user');
+  } catch (error) {
+    console.error('Error updating user:', error);
+    res.status(500).send('Error updating user: ' + error.message);
   }
 });
 
